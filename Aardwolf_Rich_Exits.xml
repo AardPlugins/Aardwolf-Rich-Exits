@@ -221,6 +221,9 @@ function trigger_exits(name, line, wildcards, style)
         if cexit_max_length > 0 then
             text = string.sub(text, 1, cexit_max_length)
         end
+        if text:match("%s") then
+            text = "'" .. text .. "'"
+        end
         Hyperlink(k, text, "moves to " .. v, "green", "", false, no_underline)
     end
 

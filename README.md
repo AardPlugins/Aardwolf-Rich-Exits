@@ -1,2 +1,3 @@
 # Aardwolf-Rich-Exits
-Additional features for displaying Exits in Aardwolf
+
+Converts room exits to hyperlinks and adds custom exits to the list of exits displayed.

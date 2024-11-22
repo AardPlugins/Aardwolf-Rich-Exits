@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+<muclient>
+    <plugin
+        name="Aardolf_Rich_Exits"
+        author="deathr"
+        id="e1220a76fc60c20130b2af36"
+        language="Lua"
+        purpose="Converts room exits to hyperlinks and adds custom exits to the list of exits displayed"
+        date_written="2024-11-22 11:44:14"
+        save_state="n"
+        requires="5.07"
+        version="1.0">
+    </plugin>
+
+    <script>
+<![CDATA[
+dofile(GetInfo(60) .. "aardwolf_colors.lua")
+
+--
+-- Plugin Methods
+--
+
+local plugin_id_gmcp_handler = "3e7dedbe37e44942dd46d264"
+local plugin_id_gmcp_mapper = "b6eae87ccedd84f510b74714"
+
+function OnPluginBroadcast(msg, id, name, text)
+    if (id == plugin_id_gmcp_handler) then
+        if (text == "room.info") then
+            on_room_info_update(gmcp("room.info"))
+        end
+    end
+end
+
+function OnPluginInstall()
+    init_plugin()
+end
+
+function OnPluginConnect()
+    init_plugin()
+end
+
+function OnPluginEnable()
+    init_plugin()
+end
+
+function init_plugin()
+    Message("Enabled Plugin")
+    SendNoEcho("tags exits on")
+    on_room_info_update(gmcp("room.info"))
+end
+
+function gmcp(s)
+    local ret, datastring = CallPlugin(plugin_id_gmcp_handler, "gmcpdata_as_string", s)
+    pcall(loadstring("data = " .. datastring))
+    return data
+end
+
+--
+-- Main Code
+--
+
+room_id = 0
+exits = {}
+cexits = {}
+cexit_commands = {}
+
+function alias_cexit(name, line, wildcards)
+    local index = tonumber(wildcards.index)
+    local cmd = cexit_commands[index]
+    if cmd == nil then
+        Message("Custom exit not found with index " .. index)
+        return
+    end
+    Execute(cmd)
+end
+
+function on_room_info_update(room_info)
+    room_id = tonumber(room_info.num)
+
+    exits = {}
+    exits["north"] = room_info.exits.n
+    exits["east"] = room_info.exits.e
+    exits["south"] = room_info.exits.s
+    exits["west"] = room_info.exits.w
+    exits["up"] = room_info.exits.u
+    exits["down"] = room_info.exits.d
+
+    -- Read custom exits from mapper plugin
+    cexits = {}
+    local rc, room_cexits = CallPlugin(plugin_id_gmcp_mapper, "room_cexits", roomid)
+    if (rc == error_code.eOK) then
+        local room_cexits = loadstring(string.format("return %s", room_cexits))()
+        if room_cexits ~= nil then
+            for k, v in pairs(room_cexits) do
+                cexits[k] = v
+                table.insert(cexit_commands, k)
+            end
+        end
+    end
+end
+
+function trigger_exits(name, line, wildcards, style)
+    ColourTell("green", "", "[ Exits:")
+    if exits["north"] ~= nil then
+        ColourTell("green", "", " ")
+        Hyperlink("north", "north", "moves to " .. exits["north"], "green", "", false)
+    end
+    if exits["east"] ~= nil then
+        ColourTell("green", "", " ")
+        Hyperlink("east", "east", "moves to " .. exits["east"], "green", "", false)
+    end
+    if exits["south"] ~= nil then
+        ColourTell("green", "", " ")
+        Hyperlink("south", "south", "moves to " .. exits["south"], "green", "", false)
+    end
+    if exits["west"] ~= nil then
+        ColourTell("green", "", " ")
+        Hyperlink("west", "west", "moves to " .. exits["west"], "green", "", false)
+    end
+    if exits["up"] ~= nil then
+        ColourTell("green", "", " ")
+        Hyperlink("up", "up", "moves to " .. exits["up"], "green", "", false)
+    end
+    if exits["down"] ~= nil then
+        ColourTell("green", "", " ")
+        Hyperlink("down", "down", "moves to " .. exits["down"], "green", "", false)
+    end
+
+    for k, v in pairs(cexits) do
+        ColourTell("green", "", " ")
+        Hyperlink(k, k, "moves to " .. v, "green", "", false)
+    end
+
+    ColourTell("green", "", " ]")
+    Note()
+    Note()
+end
+
+--
+-- Print methods
+--
+
+function Message(str)
+    AnsiNote(stylesToANSI(ColoursToStyles(string.format("\n@C[@GExits@C] %s@w\n", str))))
+end
+]]>
+    </script>
+
+    <aliases>
+        <alias
+            match="^cexit (?<index>\d+)$"
+            script="alias_cexit" 
+            enabled="y"
+            regexp="y"
+            sequence="100"
+            ignore_case="y"
+            send_to="12"></alias>
+    </aliases>
+
+    <triggers>
+        <trigger
+            match="^\{exits}\[ Exits: (?<exits>.*) \]$"
+            script="trigger_exits"
+            ignore_case="n"
+            enabled="y"
+            regexp="y"
+            sequence="100"
+            keep_evaluating="y"
+            omit_from_output="y"></trigger>
+
+        <trigger
+            match="^Tag option exits turned ON$"
+            enabled="y"
+            regexp="y"
+            sequence="100"
+            omit_from_output="y"></trigger>
+    </triggers>
+
+</muclient>

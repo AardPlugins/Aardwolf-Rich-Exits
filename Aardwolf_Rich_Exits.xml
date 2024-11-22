@@ -2,7 +2,7 @@
 <!DOCTYPE muclient>
 <muclient>
     <plugin
-        name="Aardolf_Rich_Exits"
+        name="Aardwolf_Rich_Exits"
         author="deathr"
         id="e1220a76fc60c20130b2af36"
         language="Lua"

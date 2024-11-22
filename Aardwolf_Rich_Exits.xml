@@ -8,7 +8,7 @@
         language="Lua"
         purpose="Converts room exits to hyperlinks and adds custom exits to the list of exits displayed"
         date_written="2024-11-22 11:44:14"
-        save_state="n"
+        save_state="y"
         requires="5.07"
         version="1.0">
     </plugin>
@@ -57,6 +57,87 @@ function gmcp(s)
 end
 
 --
+-- Help & Options
+--
+
+cexit_max_length_var_name = "exits_var_draw_cexit_max_length"
+draw_underline_var_name = "exits_var_draw_underline"
+
+cexit_max_length = tonumber(GetVariable(cexit_max_length_var_name)) or -1
+draw_underline = tonumber(GetVariable(draw_underline_var_name)) or 1
+
+function alias_help(name, line, wildcards)
+    Message([[@WCommands:@w
+
+  @Wrexit help                 @w- Print out this help message
+  @Wrexit options              @w- Print out the plugin options
+  @Wrexit set maxlength @Ylength @w- Sets the maximum length of the cexit name to display, set to -1 to show all
+  @Wrexit set underline        @w- Toggles displaying an underline in the hyperlinks
+  @Wcexit @Yindex                @w- Executes the cexit command based on index]])
+end
+
+function alias_options(name, line, wildcards)
+    local options_draw_underline = "@RNo"
+    if draw_underline == 1 then
+        options_draw_underline = "@GYes"
+    end
+
+    Message(string.format([[@WCurrent options:@w
+
+  @WCexit Max Length: @w(%s@w)
+  @WUnderline:        @w(%s@w)]], -1, options_draw_underline))
+end
+
+function alias_set_draw_underline(name, line, wildcards)
+    if draw_underline == 1 then
+        new_draw_underline = 0
+    else
+        new_draw_underline = 1
+    end
+
+    if new_draw_underline == 0 then
+        Message("@WExit hyperlinks will no longer have an underline")
+    else
+        Message("@WExit hyperlinks will now have an underline")
+    end
+    SetVariable(draw_underline_var_name, new_draw_underline)
+    draw_underline = new_draw_underline
+end
+
+function alias_set_draw_underline(name, line, wildcards)
+    if draw_underline == 1 then
+        new_draw_underline = 0
+    else
+        new_draw_underline = 1
+    end
+
+    if new_draw_underline == 0 then
+        Message("@WExit hyperlinks will no longer have an underline")
+    else
+        Message("@WExit hyperlinks will now have an underline")
+    end
+    SetVariable(draw_underline_var_name, new_draw_underline)
+    draw_underline = new_draw_underline
+end
+
+function alias_set_max_length(name, line, wildcards)
+    local new_max_length = tonumber(Trim(wildcards.max_length))
+    if new_max_length == nil or new_max_length == 0 then
+        Message("@WYou must specify a valid length.")
+        return
+    end
+
+    if new_max_length < 0 then
+        new_max_length = -1
+        Message("@WThe full cexit name will now be displayed")
+    else
+        Message("@WCexit names will now automatically be truncated to @Y" .. new_max_length .. " @Wcharacters")
+    end
+    SetVariable(cexit_max_length_var_name, new_max_length)
+    cexit_max_length = new_max_length
+end
+
+--
 -- Main Code
 --
 
@@ -88,6 +169,8 @@ function on_room_info_update(room_info)
 
     -- Read custom exits from mapper plugin
     cexits = {}
+    cexit_commands = {}
+
     local rc, room_cexits = CallPlugin(plugin_id_gmcp_mapper, "room_cexits", roomid)
     if (rc == error_code.eOK) then
         local room_cexits = loadstring(string.format("return %s", room_cexits))()
@@ -101,35 +184,44 @@ function on_room_info_update(room_info)
 end
 
 function trigger_exits(name, line, wildcards, style)
+    local no_underline = false
+    if draw_underline == 0 then
+        no_underline = true
+    end
+
     ColourTell("green", "", "[ Exits:")
     if exits["north"] ~= nil then
         ColourTell("green", "", " ")
-        Hyperlink("north", "north", "moves to " .. exits["north"], "green", "", false)
+        Hyperlink("north", "north", "moves to " .. exits["north"], "green", "", false, no_underline)
     end
     if exits["east"] ~= nil then
         ColourTell("green", "", " ")
-        Hyperlink("east", "east", "moves to " .. exits["east"], "green", "", false)
+        Hyperlink("east", "east", "moves to " .. exits["east"], "green", "", false, no_underline)
     end
     if exits["south"] ~= nil then
         ColourTell("green", "", " ")
-        Hyperlink("south", "south", "moves to " .. exits["south"], "green", "", false)
+        Hyperlink("south", "south", "moves to " .. exits["south"], "green", "", false, no_underline)
     end
     if exits["west"] ~= nil then
         ColourTell("green", "", " ")
-        Hyperlink("west", "west", "moves to " .. exits["west"], "green", "", false)
+        Hyperlink("west", "west", "moves to " .. exits["west"], "green", "", false, no_underline)
     end
     if exits["up"] ~= nil then
         ColourTell("green", "", " ")
-        Hyperlink("up", "up", "moves to " .. exits["up"], "green", "", false)
+        Hyperlink("up", "up", "moves to " .. exits["up"], "green", "", false, no_underline)
     end
     if exits["down"] ~= nil then
         ColourTell("green", "", " ")
-        Hyperlink("down", "down", "moves to " .. exits["down"], "green", "", false)
+        Hyperlink("down", "down", "moves to " .. exits["down"], "green", "", false, no_underline)
     end
 
     for k, v in pairs(cexits) do
         ColourTell("green", "", " ")
-        Hyperlink(k, k, "moves to " .. v, "green", "", false)
+        local text = k
+        if cexit_max_length > 0 then
+            text = string.sub(text, 1, cexit_max_length)
+        end
+        Hyperlink(k, text, "moves to " .. v, "green", "", false, no_underline)
     end
 
     ColourTell("green", "", " ]")
@@ -155,6 +247,34 @@ end
             regexp="y"
             sequence="100"
             ignore_case="y"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit set maxlength (?<max_length>.*)$"
+            script="alias_set_max_length"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit set underline$"
+            script="alias_set_draw_underline"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit options$"
+            script="alias_options"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit help$"
+            script="alias_help"
+            sequence="100"
             send_to="12"></alias>
     </aliases>
 

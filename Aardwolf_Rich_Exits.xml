@@ -286,7 +286,7 @@ function alias_cexit(name, line, wildcards)
         Message("Custom exit not found with index " .. index)
         return
     end
-    Execute(cexit)
+    Execute(cexit.cmd)
 end
 
 function on_room_info_update(room_info)

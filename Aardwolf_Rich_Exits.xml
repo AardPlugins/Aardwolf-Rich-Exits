@@ -416,8 +416,8 @@ function trigger_exits(name, line, wildcards, style)
         local text = cexit.text
 
         if cexit_trim_commmon == 1 then
-            text = Replace(text, "enter ", "", false)
-            text = Replace(text, "say ", "", false)
+            text = string.gsub(text, "^enter ", "")
+            text = string.gsub(text, "^say ", "")
         end
 
         if cexit_max_length > 0 then

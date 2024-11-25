@@ -10,7 +10,7 @@
         date_written="2024-11-22 11:44:14"
         save_state="y"
         requires="5.07"
-        version="1.4">
+        version="1.5">
     </plugin>
 
 <!--
@@ -75,6 +75,13 @@ dofile(GetPluginInfo(GetPluginID(), 20) .. "Aardwolf_Rich_Exits.lua")
             regexp="y"
             match="^rexit set exitsafterfight$"
             script="alias_set_exits_after_fight"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit debug$"
+            script="alias_set_debug_mode"
             sequence="100"
             send_to="12"></alias>
 

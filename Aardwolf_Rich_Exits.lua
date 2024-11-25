@@ -14,6 +14,7 @@ draw_underline_var_name = "exits_var_draw_underline"
 cexit_multiline_var_name = "exits_var_cexit_multiline"
 cexit_trim_commmon_var_name = "exits_var_cexit_trim_commmon"
 exits_after_fight_var_name = "exits_var_exits_after_fight"
+debug_mode_var_name = "exits_var_debug_mode"
 
 cexit_north_var_name = "exits_var_cexit_north"
 cexit_east_var_name = "exits_var_cexit_east"
@@ -27,6 +28,7 @@ draw_underline = tonumber(GetVariable(draw_underline_var_name)) or 1
 cexit_multiline = tonumber(GetVariable(cexit_multiline_var_name)) or 0
 cexit_trim_commmon = tonumber(GetVariable(cexit_trim_commmon_var_name)) or 0
 exits_after_fight = tonumber(GetVariable(exits_after_fight_var_name)) or 0
+debug_mode = tonumber(GetVariable(debug_mode_var_name)) or 0
 
 cexit_north = GetVariable(cexit_north_var_name) or "open north;north"
 cexit_east = GetVariable(cexit_east_var_name) or "open east;east"
@@ -98,6 +100,8 @@ function alias_help(name, line, wildcards)
     Message([[@WCommands:@w
 
   @Wrexit help                 @w- Print out this help message
+  @Wrexit update               @w- Updates to the latest version of the plugin
+  @Wrexit reload               @w- Reloads the plugin
   @Wrexit options              @w- Print out the plugin options
   @Wrexit set maxlength @Ylength @w- Sets the maximum length of the cexit name to display, set to -1 to show all
   @Wrexit set underline        @w- Toggles displaying an underline in the hyperlinks
@@ -105,7 +109,10 @@ function alias_help(name, line, wildcards)
   @Wrexit set exitsafterfight  @w- Toggles displaying the exits after a fight
   @Wrexit set trimcommon       @w- Trims common words like say and enter from cexit names
   @Wrexit set cexit @Ydir cmd    @w- Set door opening cexit command for standard cardinal directions
-  @Wcexit @Yindex                @w- Executes the cexit command based on index]])
+  @Wcexit @Yindex                @w- Executes the cexit command based on index
+
+  @Wrexit debug                @w- Toggles debug logs
+  @Wrexit force update @Ybranch  @w- Force updates to the branch specified]])
 end
 
 function alias_options(name, line, wildcards)
@@ -233,6 +240,24 @@ function alias_set_exits_after_fight(name, line, wildcards)
     end
     SetVariable(exits_after_fight_var_name, new_exits_after_fight)
     exits_after_fight = new_exits_after_fight
+end
+
+function alias_set_debug_mode(name, line, wildcards)
+    local new_debug_mode = -1
+
+    if debug_mode == 1 then
+        new_debug_mode = 0
+    else
+        new_debug_mode = 1
+    end
+
+    if new_debug_mode == 0 then
+        Message("@WDisabled debug logs")
+    else
+        Message("@WEnabled debug logs")
+    end
+    SetVariable(debug_mode_var_name, new_debug_mode)
+    debug_mode = new_debug_mode
 end
 
 function alias_set_max_length(name, line, wildcards)
@@ -615,6 +640,6 @@ function reload_plugin()
         SetAlphaOption("script_prefix", "\\\\\\")
     end
     Execute(
-        GetAlphaOption("script_prefix") .. 'DoAfterSpecial(1, "ReloadPlugin(\'' .. GetPluginID() .. '\')", sendto.script)'
+        GetAlphaOption("script_prefix") .. 'DoAfterSpecial(0.5, "ReloadPlugin(\'' .. GetPluginID() .. '\')", sendto.script)'
     )
 end

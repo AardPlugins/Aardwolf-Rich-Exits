@@ -10,7 +10,7 @@
         date_written="2024-11-22 11:44:14"
         save_state="y"
         requires="5.07"
-        version="1.0">
+        version="1.2">
     </plugin>
 
 <!--
@@ -24,7 +24,6 @@ dofile(GetPluginInfo(GetPluginID(), 20) .. "Aardwolf_Rich_Exits.lua")
 ]]>
     </script>
 -->
-
     <script>
 <![CDATA[
 dofile(GetInfo(60) .. "aardwolf_colors.lua")
@@ -34,6 +33,7 @@ dofile(GetInfo(60) .. "aardwolf_colors.lua")
 --
 
 room_id = 0
+room_name = ""
 exits = {}
 cexits = {}
 
@@ -41,6 +41,7 @@ cexit_max_length_var_name = "exits_var_draw_cexit_max_length"
 draw_underline_var_name = "exits_var_draw_underline"
 cexit_multiline_var_name = "exits_var_cexit_multiline"
 cexit_trim_commmon_var_name = "exits_var_cexit_trim_commmon"
+exits_after_fight_var_name = "exits_var_exits_after_fight"
 
 cexit_north_var_name = "exits_var_cexit_north"
 cexit_east_var_name = "exits_var_cexit_east"
@@ -53,6 +54,7 @@ cexit_max_length = tonumber(GetVariable(cexit_max_length_var_name)) or -1
 draw_underline = tonumber(GetVariable(draw_underline_var_name)) or 1
 cexit_multiline = tonumber(GetVariable(cexit_multiline_var_name)) or 0
 cexit_trim_commmon = tonumber(GetVariable(cexit_trim_commmon_var_name)) or 0
+exits_after_fight = tonumber(GetVariable(exits_after_fight_var_name)) or 0
 
 cexit_north = GetVariable(cexit_north_var_name) or "open north;north"
 cexit_east = GetVariable(cexit_east_var_name) or "open east;east"
@@ -60,6 +62,8 @@ cexit_south = GetVariable(cexit_south_var_name) or "open south;south"
 cexit_west = GetVariable(cexit_west_var_name) or "open west;west"
 cexit_up = GetVariable(cexit_up_var_name) or "open up;up"
 cexit_down = GetVariable(cexit_down_var_name) or "open down;down"
+
+local character_state = -1
 
 --
 -- Plugin Methods
@@ -72,6 +76,8 @@ function OnPluginBroadcast(msg, id, name, text)
     if (id == plugin_id_gmcp_handler) then
         if (text == "room.info") then
             on_room_info_update(gmcp("room.info"))
+        elseif (text == "char.status") then
+            on_character_status_update(gmcp("char.status"))
         end
     end
 end
@@ -103,6 +109,7 @@ function init_plugin()
     Message("Enabled Plugin")
     SendNoEcho("tags exits on")
     on_room_info_update(gmcp("room.info"))
+    on_character_status_update(gmcp("char.status"))
 end
 
 function gmcp(s)
@@ -123,6 +130,7 @@ function alias_help(name, line, wildcards)
   @Wrexit set maxlength @Ylength @w- Sets the maximum length of the cexit name to display, set to -1 to show all
   @Wrexit set underline        @w- Toggles displaying an underline in the hyperlinks
   @Wrexit set multiline        @w- Toggles displaying cexits on their own line
+  @Wrexit set exitsafterfight  @w- Toggles displaying the exits after a fight
   @Wrexit set trimcommon       @w- Trims common words like say and enter from cexit names
   @Wrexit set cexit @Ydir cmd    @w- Set door opening cexit command for standard cardinal directions
   @Wcexit @Yindex                @w- Executes the cexit command based on index]])
@@ -150,22 +158,31 @@ function alias_options(name, line, wildcards)
         options_cexit_trim_commmon = "@RNil"
     end
 
+    local options_exits_after_fight = "@RNo"
+    if exits_after_fight == 1 then
+        options_exits_after_fight = "@GYes"
+    elseif exits_after_fight == nil then
+        options_exits_after_fight = "@RNil"
+    end
+
     Message(string.format([[@WCurrent options:@w
 
-  @WCexit Max Length: @w(%s@w)
-  @WUnderline:        @w(%s@w)
-  @WMultiline:        @w(%s@w)
-  @WTrim common:      @w(%s@w)
-  @WNorth Cexit:      @w(%s@w)
-  @WEast Cexit:       @w(%s@w)
-  @WSouth Cexit:      @w(%s@w)
-  @WWest Cexit:       @w(%s@w)
-  @WUp Cexit:         @w(%s@w)
-  @WDown Cexit:       @w(%s@w)]],
+  @WCexit Max Length:  @w(%s@w)
+  @WUnderline:         @w(%s@w)
+  @WMultiline:         @w(%s@w)
+  @WTrim common:       @w(%s@w)
+  @WExits after Fight: @w(%s@w)
+  @WNorth Cexit:       @w(%s@w)
+  @WEast Cexit:        @w(%s@w)
+  @WSouth Cexit:       @w(%s@w)
+  @WWest Cexit:        @w(%s@w)
+  @WUp Cexit:          @w(%s@w)
+  @WDown Cexit:        @w(%s@w)]],
     cexit_max_length,
     options_draw_underline,
     options_cexit_multiline,
     options_cexit_trim_commmon,
+    options_exits_after_fight,
     cexit_north,
     cexit_east,
     cexit_south,
@@ -226,6 +243,24 @@ function alias_set_trim_common(name, line, wildcards)
     end
     SetVariable(cexit_trim_commmon_var_name, new_cexit_trim_commmon)
     cexit_trim_commmon = new_cexit_trim_commmon
+end
+
+function alias_set_exits_after_fight(name, line, wildcards)
+    local new_exits_after_fight = -1
+
+    if exits_after_fight == 1 then
+        new_exits_after_fight = 0
+    else
+        new_exits_after_fight = 1
+    end
+
+    if new_exits_after_fight == 0 then
+        Message("@WNo longer printing exits after a fight")
+    else
+        Message("@WExits will now be printed after a fight")
+    end
+    SetVariable(exits_after_fight_var_name, new_exits_after_fight)
+    exits_after_fight = new_exits_after_fight
 end
 
 function alias_set_max_length(name, line, wildcards)
@@ -291,12 +326,15 @@ end
 
 function on_room_info_update(room_info)
     if room_info.exits == nil then
+        room_id = 0
+        room_name = ""
         exits = {}
         cexits = {}
         return
     end
 
     room_id = tonumber(room_info.num)
+    room_name = room_info.name
 
     exits = {
         north = {
@@ -358,6 +396,10 @@ function on_room_info_update(room_info)
 end
 
 function trigger_exits(name, line, wildcards, style)
+    display_exits()
+end
+
+function display_exits()
     local no_underline = false
     if draw_underline == 0 then
         no_underline = true
@@ -439,12 +481,140 @@ function trigger_exits(name, line, wildcards, style)
     Note()
 end
 
+function on_character_status_update(status)
+    -- handle state changes
+    local previous_state = character_state
+    character_state = tonumber(status.state)
+
+    if previous_state ~= character_state and previous_state ~= -1 then
+        on_character_state_change(previous_state, character_state)
+    end
+end
+
+function on_character_state_change(previous_state, new_state)
+    if previous_state == 8 and new_state ~= 8 then
+        -- exiting fighting state
+        if exits_after_fight == 1 then
+            Note()
+            ColourNote("green", "", room_name)
+            Note()
+            display_exits()
+        end
+    end
+end
+
 --
 -- Print methods
 --
 
 function Message(str)
     AnsiNote(stylesToANSI(ColoursToStyles(string.format("\n@C[@GExits@C] %s@w\n", str))))
+end
+
+function Debug(str)
+    Message(string.format("@gDEBUG@w %s", str))
+end
+
+function Error(str)
+    Message(string.format("@RERROR@w %s", str))
+end
+
+--
+-- Update code
+--
+
+async = require "async"
+
+local version_url = "https://raw.githubusercontent.com/AardPlugins/Aardwolf-Rich-Exits/refs/heads/main/VERSION"
+local plugin_url = "https://raw.githubusercontent.com/AardPlugins/Aardwolf-Rich-Exits/refs/%s/Aardwolf_Rich_Exits.xml"
+local plugin_version = GetPluginInfo(GetPluginID(), 19)
+
+function alias_reload_plugin(name, line, wildcards)
+    Message("Reloading plugin")
+    reload_plugin()
+end
+
+function alias_update_plugin(name, line, wildcards)
+    Debug("Checking version to see if it should update itself")
+    download_version_file(do_update)
+end
+
+function alias_force_update_plugin(name, line, wildcards)
+    local branch = "main"
+
+    if wildcards.branch ~= "" then
+        branch = wildcards.branch
+    end
+
+    Debug("Forcing update to branch " .. branch)
+
+    branch = "heads/" .. branch
+    download_plugin(branch, callback_update_plugin)
+end
+
+function download_plugin(version, callback)
+    Debug("Downloading plugin version " .. version)
+    local url = string.format(plugin_url, version)
+    download_file(url, callback)
+end
+
+function download_version_file(callback)
+    Debug("Attempting to download VERSION file")
+    local url = version_url
+    download_file(url, check_version_callback(callback))
+end
+
+function download_file(url, callback)
+    Debug("Starting download of " .. url)
+    async.doAsyncRemoteRequest(url, callback, "HTTPS")
+end
+
+function check_version_callback(callback)
+    return function(retval, page, status, headers, full_status, request_url)
+        if status ~= 200 then
+            Error("Error while fetching latest version number")
+            return
+        end
+
+        local upstream_version = Trim(page)
+        if upstream_version ~= tostring(plugin_version) then
+            callback(upstream_version)
+        else
+            Message("@WNo new updates available")
+        end
+    end
+end
+
+function do_update(version)
+    Debug("Attempting to update to version " .. version)
+    branch = "tags/v" .. version
+    download_plugin(branch, callback_update_plugin)
+end
+
+function callback_update_plugin(retval, page, status, headers, full_status, request_url)
+    if status ~= 200 then
+        Error("Error while fetching the plugin")
+        return
+    end
+
+    Message("Updating plugin. Do not touch anything!")
+
+    local file = io.open(GetPluginInfo(GetPluginID(), 6), "w")
+    file:write(page)
+    file:close()
+
+    reload_plugin()
+
+    Message("@WUpdate complete!")
+end
+
+function reload_plugin()
+    if GetAlphaOption("script_prefix") == "" then
+        SetAlphaOption("script_prefix", "\\\\\\")
+    end
+    Execute(
+        GetAlphaOption("script_prefix") .. 'DoAfterSpecial(1, "ReloadPlugin(\'' .. GetPluginID() .. '\')", sendto.script)'
+    )
 end
 ]]>
     </script>
@@ -499,6 +669,13 @@ end
 
         <alias enabled="y"
             regexp="y"
+            match="^rexit set exitsafterfight$"
+            script="alias_set_exits_after_fight"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
             match="^rexit set cexit (?<dir>north|east|south|west|up|down) (?<cmd>.*)$"
             script="alias_set_cexit_dir"
             sequence="100"
@@ -515,6 +692,28 @@ end
             regexp="y"
             match="^rexit help$"
             script="alias_help"
+            sequence="100"
+            send_to="12"></alias>
+
+        <!-- Update Aliases -->
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit update$"
+            script="alias_update_plugin"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit force update(?: (?<branch>\S+))?$"
+            script="alias_force_update_plugin"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit reload$"
+            script="alias_reload_plugin"
             sequence="100"
             send_to="12"></alias>
     </aliases>

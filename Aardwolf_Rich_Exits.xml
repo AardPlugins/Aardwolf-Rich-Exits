@@ -14,7 +14,7 @@
     </plugin>
 
 <!--
-https://github.com/AardPlugins/Aardwolf-Rich-Exits 
+https://github.com/AardPlugins/Aardwolf-Rich-Exits
 -->
 
 <!-- For local development: Load a separate Lua file
@@ -632,7 +632,7 @@ end
     <aliases>
         <alias
             match="^cexit (?<index>\d+)$"
-            script="alias_cexit" 
+            script="alias_cexit"
             enabled="y"
             regexp="y"
             sequence="100"

@@ -509,7 +509,9 @@ function Message(str)
 end
 
 function Debug(str)
-    Message(string.format("@gDEBUG@w %s", str))
+    if debug_mode == 1 then
+        Message(string.format("@gDEBUG@w %s", str))
+    end
 end
 
 function Error(str)

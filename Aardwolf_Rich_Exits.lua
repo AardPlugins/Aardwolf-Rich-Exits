@@ -516,7 +516,7 @@ local download_file_branch = ""
 local plugin_version = GetPluginInfo(GetPluginID(), 19)
 
 function download_file(url, callback)
-    DebugNote("Starting download of " .. url)
+    Debug("Starting download of " .. url)
     -- Add timestamp as a query parameter to bust cache
     url = url .. "?t=" .. GetInfo(304)
     async.doAsyncRemoteRequest(url, callback, "HTTPS")
@@ -572,7 +572,7 @@ function download_plugin(branch)
 end
 
 function download_next_file()
-    download_file_index += 1
+    download_file_index = download_file_index + 1
 
     if download_file_index > #plugin_files then
         Debug("All plugin files downloaded")

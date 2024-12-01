@@ -363,7 +363,7 @@ function on_room_info_update(room_info)
     -- Read custom exits from mapper plugin
     cexits = {}
 
-    local rc, room_cexits = CallPlugin(plugin_id_gmcp_mapper, "room_cexits", roomid)
+    local rc, room_cexits = CallPlugin(plugin_id_gmcp_mapper, "room_cexits", room_id)
     if (rc == error_code.eOK) then
         local room_cexits = loadstring(string.format("return %s", room_cexits))()
         if room_cexits ~= nil then

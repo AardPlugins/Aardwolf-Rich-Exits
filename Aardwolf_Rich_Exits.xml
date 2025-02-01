@@ -10,7 +10,7 @@
         date_written="2024-11-22 11:44:14"
         save_state="y"
         requires="5.07"
-        version="1.7">
+        version="1.8">
     </plugin>
 
 <!--
@@ -45,8 +45,22 @@ dofile(GetPluginInfo(GetPluginID(), 20) .. "Aardwolf_Rich_Exits.lua")
 
         <alias enabled="y"
             regexp="y"
+            match="^rexit reset window$"
+            script="alias_reset_window"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
             match="^rexit set maxlength (?<max_length>.*)$"
             script="alias_set_max_length"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
+            match="^rexit set window$"
+            script="alias_set_show_window"
             sequence="100"
             send_to="12"></alias>
 

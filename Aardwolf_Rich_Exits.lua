@@ -1,5 +1,8 @@
 dofile(GetInfo(60) .. "aardwolf_colors.lua")
 
+require "aardwolf_colors"
+require "themed_miniwindows"
+
 --
 -- Variables
 --
@@ -14,6 +17,7 @@ draw_underline_var_name = "exits_var_draw_underline"
 cexit_multiline_var_name = "exits_var_cexit_multiline"
 cexit_trim_commmon_var_name = "exits_var_cexit_trim_commmon"
 exits_after_fight_var_name = "exits_var_exits_after_fight"
+show_window_var_name = "exits_var_show_window"
 debug_mode_var_name = "exits_var_debug_mode"
 
 cexit_north_var_name = "exits_var_cexit_north"
@@ -28,6 +32,7 @@ draw_underline = tonumber(GetVariable(draw_underline_var_name)) or 1
 cexit_multiline = tonumber(GetVariable(cexit_multiline_var_name)) or 0
 cexit_trim_commmon = tonumber(GetVariable(cexit_trim_commmon_var_name)) or 0
 exits_after_fight = tonumber(GetVariable(exits_after_fight_var_name)) or 0
+show_window = tonumber(GetVariable(show_window_var_name)) or 1
 debug_mode = tonumber(GetVariable(debug_mode_var_name)) or 0
 
 cexit_north = GetVariable(cexit_north_var_name) or "open north;north"
@@ -84,6 +89,8 @@ function init_plugin()
     SendNoEcho("tags exits on")
     on_room_info_update(gmcp("room.info"))
     on_character_status_update(gmcp("char.status"))
+
+    create_window()
 end
 
 function gmcp(s)
@@ -102,8 +109,10 @@ function alias_help(name, line, wildcards)
   @Wrexit help                 @w- Print out this help message
   @Wrexit update               @w- Updates to the latest version of the plugin
   @Wrexit reload               @w- Reloads the plugin
+  @Wrexit reset window         @w- Resets the window to its default position
   @Wrexit options              @w- Print out the plugin options
   @Wrexit set maxlength @Ylength @w- Sets the maximum length of the cexit name to display, set to -1 to show all
+  @Wrexit set window           @w- Toggles displaying the window
   @Wrexit set underline        @w- Toggles displaying an underline in the hyperlinks
   @Wrexit set multiline        @w- Toggles displaying cexits on their own line
   @Wrexit set exitsafterfight  @w- Toggles displaying the exits after a fight
@@ -116,6 +125,13 @@ function alias_help(name, line, wildcards)
 end
 
 function alias_options(name, line, wildcards)
+    local options_show_window = "@RNo"
+    if show_window == 1 then
+        options_show_window = "@GYes"
+    elseif show_window == nil then
+        options_show_window = "@RNil"
+    end
+
     local options_draw_underline = "@RNo"
     if draw_underline == 1 then
         options_draw_underline = "@GYes"
@@ -147,6 +163,7 @@ function alias_options(name, line, wildcards)
     Message(string.format([[@WCurrent options:@w
 
   @WCexit Max Length:  @w(%s@w)
+  @WShow Window:       @w(%s@w)
   @WUnderline:         @w(%s@w)
   @WMultiline:         @w(%s@w)
   @WTrim common:       @w(%s@w)
@@ -158,6 +175,7 @@ function alias_options(name, line, wildcards)
   @WUp Cexit:          @w(%s@w)
   @WDown Cexit:        @w(%s@w)]],
     cexit_max_length,
+    options_show_window,
     options_draw_underline,
     options_cexit_multiline,
     options_cexit_trim_commmon,
@@ -168,6 +186,31 @@ function alias_options(name, line, wildcards)
     cexit_west,
     cexit_up,
     cexit_down))
+end
+
+function alias_set_show_window(name, line, wildcards)
+    local new_show_window = -1
+
+    if show_window == 1 then
+        new_show_window = 0
+    else
+        new_show_window = 1
+    end
+
+    SetVariable(show_window_var_name, new_show_window)
+    show_window = new_show_window
+
+    if new_show_window == 0 then
+        Message("@WDisabling the window")
+        if my_window ~= nil then
+            my_window:delete()
+            my_window = nil
+        end
+    else
+        Message("@WEnabling the window")
+        create_window()
+        draw_window()
+    end
 end
 
 function alias_set_draw_underline(name, line, wildcards)
@@ -394,6 +437,7 @@ end
 
 function trigger_exits(name, line, wildcards, style)
     display_exits()
+    draw_window()
 end
 
 function display_exits()
@@ -498,6 +542,169 @@ function on_character_state_change(previous_state, new_state)
             display_exits()
         end
     end
+end
+
+
+--
+-- Window methods
+--
+
+default_window_width = 400
+default_window_height = 50
+my_window = nil
+
+function alias_reset_window(name, line, wildcards)
+    if show_window == 0 or my_window == nil then
+        Error("Window is not enabled")
+        return
+    end
+
+    my_window:reset()
+
+    -- Make sure it isn't behind any other miniwindows.
+    my_window:bring_to_front()
+end
+
+function create_window()
+    if show_window == 0 then
+        return
+    end
+
+    my_window = ThemedTextWindow(
+        GetPluginID(),  -- id
+        (GetInfo(281)-default_window_width)/2,  -- default_left_position
+        (GetInfo(280)-default_window_height)/2,  -- default_top_position
+        default_window_width,  -- default_width
+        default_window_height,  -- default_height
+        "Rich Exits",  -- title
+        "center",  -- title alignment
+        false,  -- is_temporary (closeable)
+        true,  -- resizeable
+        false,  -- text_scrollable
+        false,  -- text_selectable
+        false,  -- text_copyable
+        true,  -- url_hyperlinks
+        true,  -- autowrap
+        nil,  -- title_font_name
+        6,  -- title_font_size
+        GetAlphaOption("output_font_name"), -- text_font_name
+        GetOption("output_font_height"),  -- text_font_size
+        3,  -- text_max_lines
+        nil,  -- text_padding
+        false,  -- defer_showing
+        false -- body_is_transparent
+    )
+
+    -- Make sure it isn't behind any other miniwindows.
+    my_window:bring_to_front()
+end
+
+function draw_window()
+    if show_window == 0 or my_window == nil then
+        return
+    end
+
+    my_window:clear(false)
+
+    text = "@g"
+    links = {}
+
+    local has_one_cardinal = false
+
+    if exits.north.room_id ~= nil then
+        has_one_cardinal = true
+        table.insert(links, {
+            label="moves to " .. exits.north.room_id,
+            start=#text - 1,
+            stop=#text + 3,
+            text="Execute(\"" .. exits.north.cmd .. "\")"
+        })
+        text = text .. "north "
+    end
+    if exits.east.room_id ~= nil then
+        has_one_cardinal = true
+        table.insert(links, {
+            label="moves to " .. exits.east.room_id,
+            start=#text - 1,
+            stop=#text + 2,
+            text="Execute(\"" .. exits.east.cmd .. "\")"
+        })
+        text = text .. "east "
+    end
+    if exits.south.room_id ~= nil then
+        has_one_cardinal = true
+        table.insert(links, {
+            label="moves to " .. exits.south.room_id,
+            start=#text - 1,
+            stop=#text + 3,
+            text="Execute(\"" .. exits.south.cmd .. "\")"
+        })
+        text = text .. "south "
+    end
+    if exits.west.room_id ~= nil then
+        has_one_cardinal = true
+        table.insert(links, {
+            label="moves to " .. exits.west.room_id,
+            start=#text - 1,
+            stop=#text + 2,
+            text="Execute(\"" .. exits.west.cmd .. "\")"
+        })
+        text = text .. "west "
+    end
+    if exits.up.room_id ~= nil then
+        has_one_cardinal = true
+        table.insert(links, {
+            label="moves to " .. exits.up.room_id,
+            start=#text - 1,
+            stop=#text,
+            text="Execute(\"" .. exits.up.cmd .. "\")"
+        })
+        text = text .. "up "
+    end
+    if exits.down.room_id ~= nil then
+        has_one_cardinal = true
+        table.insert(links, {
+            label="moves to " .. exits.down.room_id,
+            start=#text - 1,
+            stop=#text + 2,
+            text="Execute(\"" .. exits.down.cmd .. "\")"
+        })
+        text = text .. "down "
+    end
+
+    for i, cexit in ipairs(cexits) do
+        local ctext = cexit.text
+
+        if cexit_trim_commmon == 1 then
+            ctext = string.gsub(ctext, "^enter ", "")
+            ctext = string.gsub(ctext, "^say ", "")
+        end
+
+        if cexit_max_length > 0 then
+            ctext = string.sub(ctext, 1, cexit_max_length)
+        end
+        if ctext:match("%s") then
+            ctext = "'" .. ctext .. "'"
+        end
+        local hint = "'" .. cexit.text .. "' moves to " .. cexit.room_id
+
+        table.insert(links, {
+            label=hint,
+            start=#text - 1,
+            stop=#text + #ctext - 2,
+            text="Execute(\"" .. cexit.cmd .. "\")"
+        })
+        text = text .. ctext .. " "
+    end
+
+    if not has_one_cardinal and #cexits <= 0 then
+        text = text .. " none"
+    end
+
+    my_window:add_text(text, false, links)
+
+    -- I used the defer_showing flag, so now I have to show the window.
+    my_window:show()
 end
 
 --

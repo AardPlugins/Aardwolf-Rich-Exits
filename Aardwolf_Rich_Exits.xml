@@ -35,7 +35,7 @@ dofile(GetPluginInfo(GetPluginID(), 20) .. "Aardwolf_Rich_Exits.lua")
 
     <aliases>
         <alias
-            match="^cexit (?<index>\d+)$"
+            match="^cexit (?<index>\d+||[neswud])$"
             script="alias_cexit"
             enabled="y"
             regexp="y"

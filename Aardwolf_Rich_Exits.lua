@@ -412,16 +412,22 @@ function on_room_info_update(room_info)
         if room_cexits ~= nil then
             for k, v in pairs(room_cexits) do
                 if k == cexit_north then
+                    exits.north.room_id = v
                     exits.north.cmd = k
                 elseif k == cexit_east then
+                    exits.east.room_id = v
                     exits.east.cmd = k
                 elseif k == cexit_south then
+                    exits.south.room_id = v
                     exits.south.cmd = k
                 elseif k == cexit_west then
+                    exits.west.room_id = v
                     exits.west.cmd = k
                 elseif k == cexit_up then
+                    exits.up.room_id = v
                     exits.up.cmd = k
                 elseif k == cexit_down then
+                    exits.down.room_id = v
                     exits.down.cmd = k
                 else
                     table.insert(cexits, {

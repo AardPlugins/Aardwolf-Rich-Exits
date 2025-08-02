@@ -648,18 +648,6 @@ function display_exits()
     for i, cexit in ipairs(cexits) do
         ColourTell("green", "", " ")
         local text = cexit.text
-
-        if cexit_trim_commmon == 1 then
-            text = string.gsub(text, "^enter ", "")
-            text = string.gsub(text, "^say ", "")
-        end
-
-        if cexit_max_length > 0 then
-            text = string.sub(text, 1, cexit_max_length)
-        end
-        if text:match("%s") then
-            text = "'" .. text .. "'"
-        end
         local hint = "'" .. cexit.text .. "' moves to " .. cexit.room_id
         Hyperlink(cexit.cmd, text, hint, "green", "", false, no_underline)
     end
@@ -825,18 +813,6 @@ function draw_window()
 
     for i, cexit in ipairs(cexits) do
         local ctext = cexit.text
-
-        if cexit_trim_commmon == 1 then
-            ctext = string.gsub(ctext, "^enter ", "")
-            ctext = string.gsub(ctext, "^say ", "")
-        end
-
-        if cexit_max_length > 0 then
-            ctext = string.sub(ctext, 1, cexit_max_length)
-        end
-        if ctext:match("%s") then
-            ctext = "'" .. ctext .. "'"
-        end
         local hint = "'" .. cexit.text .. "' moves to " .. cexit.room_id
 
         table.insert(links, {

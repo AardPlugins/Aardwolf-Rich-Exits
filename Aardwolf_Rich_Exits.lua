@@ -510,8 +510,8 @@ function prepare_all_exits()
         if standard_dirs[dir] then
             -- Handle standard direction exits (n, s, e, w, u, d, north, south, etc.)
             local std_dir = standard_dirs[dir]
-            if not exits[std_dir].room_id then
-                -- GMCP didn't have this exit, add from database/mapper
+            if not exits[std_dir].room_id and dest_room ~= "-1" then
+                -- GMCP didn't have this exit and it's not an invalid (-1) destination
                 exits[std_dir].room_id = dest_room
                 exits[std_dir].cmd = dir  -- Use original direction command
                 Debug(string.format("Added missing standard exit: %s -> %s", dir, dest_room))

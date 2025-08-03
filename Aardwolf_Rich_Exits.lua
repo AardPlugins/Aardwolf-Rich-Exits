@@ -121,7 +121,7 @@ function sanitize_filename(filename)
     return string.gsub(filename, "[<>:\"/\\|?*]", "_")
 end
 
-function try_database_exits(room_id)
+function with_database(callback)
     local db_file = GetInfo(66) .. get_database_name() .. ".db"
     local db, err = sqlite3.open(db_file)
     if not db then
@@ -129,26 +129,35 @@ function try_database_exits(room_id)
         return nil
     end
 
-    local success, exits_data = pcall(function()
-        local exits = {}
-        local query = string.format("SELECT dir, touid FROM exits WHERE fromuid = '%s'", room_id)
+    local success, result = pcall(callback, db)
+    db:close()  -- Always called, regardless of success/failure
 
-        for row in db:nrows(query) do
+    if not success then
+        Debug("Database operation failed: " .. tostring(result))
+        return nil
+    end
+
+    return result
+end
+
+function try_database_exits(room_id)
+    return with_database(function(db)
+        local exits = {}
+        local stmt = db:prepare("SELECT dir, touid FROM exits WHERE fromuid = ?")
+        if not stmt then
+            error("Failed to prepare SQL statement")
+        end
+
+        stmt:bind(1, room_id)
+
+        for row in stmt:nrows() do
             exits[row.dir] = row.touid
             Debug(string.format("Found database exit: %s -> %s", row.dir, row.touid))
         end
 
+        stmt:finalize()
         return exits
     end)
-
-    db:close()
-
-    if not success then
-        Debug("Database query failed: " .. tostring(exits_data))
-        return nil
-    end
-
-    return exits_data
 end
 
 function get_mapper_plugin_exits(room_id)

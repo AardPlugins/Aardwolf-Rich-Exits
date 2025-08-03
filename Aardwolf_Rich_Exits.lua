@@ -35,12 +35,12 @@ exits_after_fight = tonumber(GetVariable(exits_after_fight_var_name)) or 0
 show_window = tonumber(GetVariable(show_window_var_name)) or 1
 debug_mode = tonumber(GetVariable(debug_mode_var_name)) or 0
 
-cexit_north = GetVariable(cexit_north_var_name) or "open n;n"
-cexit_east = GetVariable(cexit_east_var_name) or "open e;e"
-cexit_south = GetVariable(cexit_south_var_name) or "open s;s"
-cexit_west = GetVariable(cexit_west_var_name) or "open w;w"
-cexit_up = GetVariable(cexit_up_var_name) or "open u;u"
-cexit_down = GetVariable(cexit_down_var_name) or "open d;d"
+cexit_north = GetVariable(cexit_north_var_name) or "open north;north"
+cexit_east = GetVariable(cexit_east_var_name) or "open east;east"
+cexit_south = GetVariable(cexit_south_var_name) or "open south;south"
+cexit_west = GetVariable(cexit_west_var_name) or "open west;west"
+cexit_up = GetVariable(cexit_up_var_name) or "open up;up"
+cexit_down = GetVariable(cexit_down_var_name) or "open down;down"
 
 local character_state = -1
 

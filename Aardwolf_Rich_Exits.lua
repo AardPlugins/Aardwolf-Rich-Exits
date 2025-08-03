@@ -19,6 +19,7 @@ cexit_trim_commmon_var_name = "exits_var_cexit_trim_commmon"
 exits_after_fight_var_name = "exits_var_exits_after_fight"
 show_window_var_name = "exits_var_show_window"
 debug_mode_var_name = "exits_var_debug_mode"
+use_database_var_name = "exits_var_use_database"
 
 cexit_north_var_name = "exits_var_cexit_north"
 cexit_east_var_name = "exits_var_cexit_east"
@@ -34,6 +35,7 @@ cexit_trim_commmon = tonumber(GetVariable(cexit_trim_commmon_var_name)) or 0
 exits_after_fight = tonumber(GetVariable(exits_after_fight_var_name)) or 0
 show_window = tonumber(GetVariable(show_window_var_name)) or 1
 debug_mode = tonumber(GetVariable(debug_mode_var_name)) or 0
+use_database = tonumber(GetVariable(use_database_var_name)) or 1
 
 cexit_north = GetVariable(cexit_north_var_name) or "open north;north"
 cexit_east = GetVariable(cexit_east_var_name) or "open east;east"
@@ -43,6 +45,9 @@ cexit_up = GetVariable(cexit_up_var_name) or "open up;up"
 cexit_down = GetVariable(cexit_down_var_name) or "open down;down"
 
 local character_state = -1
+
+-- Database connection variables
+db_name = nil  -- Will be determined dynamically
 
 --
 -- Plugin Methods
@@ -100,6 +105,87 @@ function gmcp(s)
 end
 
 --
+-- Database Access Functions
+--
+
+function get_database_name()
+    if not db_name then
+        -- Use same logic as mapper plugin
+        db_name = GetVariable("db_name") or sanitize_filename(WorldName())
+    end
+    return db_name
+end
+
+function sanitize_filename(filename)
+    -- Basic filename sanitization for database name
+    return string.gsub(filename, "[<>:\"/\\|?*]", "_")
+end
+
+function with_database(callback)
+    local db_file = GetInfo(66) .. get_database_name() .. ".db"
+    local db, err = sqlite3.open(db_file)
+    if not db then
+        Debug("Failed to open mapper database: " .. (err or "unknown error"))
+        return nil
+    end
+
+    local success, result = pcall(callback, db)
+    db:close()  -- Always called, regardless of success/failure
+
+    if not success then
+        Debug("Database operation failed: " .. tostring(result))
+        return nil
+    end
+
+    return result
+end
+
+function try_database_exits(room_id)
+    return with_database(function(db)
+        local exits = {}
+        local stmt = db:prepare("SELECT dir, touid FROM exits WHERE fromuid = ?")
+        if not stmt then
+            error("Failed to prepare SQL statement")
+        end
+
+        stmt:bind(1, room_id)
+
+        for row in stmt:nrows() do
+            exits[row.dir] = row.touid
+            Debug(string.format("Found database exit: %s -> %s", row.dir, row.touid))
+        end
+
+        stmt:finalize()
+        return exits
+    end)
+end
+
+function get_mapper_plugin_exits(room_id)
+    local rc, room_cexits = CallPlugin(plugin_id_gmcp_mapper, "room_cexits", room_id)
+    if rc == error_code.eOK then
+        local room_cexits = loadstring(string.format("return %s", room_cexits))()
+        if room_cexits then
+            Debug("Retrieved exits from mapper plugin")
+            return room_cexits
+        end
+    end
+    Debug("Mapper plugin call failed or returned no data")
+    return {}
+end
+
+function get_custom_exits(room_id)
+    if use_database == 1 then
+        local db_exits = try_database_exits(room_id)
+        if db_exits then
+            return db_exits
+        end
+        -- Fallback to mapper plugin
+        Debug("Database access failed, falling back to mapper plugin")
+    end
+    return get_mapper_plugin_exits(room_id)
+end
+
+--
 -- Help & Options
 --
 
@@ -117,6 +203,7 @@ function alias_help(name, line, wildcards)
   @Wrexit set multiline        @w- Toggles displaying cexits on their own line
   @Wrexit set exitsafterfight  @w- Toggles displaying the exits after a fight
   @Wrexit set trimcommon       @w- Trims common words like say and enter from cexit names
+  @Wrexit set database         @w- Toggles reading exits directly from mapper database
   @Wrexit set cexit @Ydir cmd    @w- Set door opening cexit command for standard cardinal directions
   @Wcexit @Yindex                @w- Executes the cexit command based on index
 
@@ -160,6 +247,13 @@ function alias_options(name, line, wildcards)
         options_exits_after_fight = "@RNil"
     end
 
+    local options_use_database = "@RNo"
+    if use_database == 1 then
+        options_use_database = "@GYes"
+    elseif use_database == nil then
+        options_use_database = "@RNil"
+    end
+
     Message(string.format([[@WCurrent options:@w
 
   @WCexit Max Length:  @w(%s@w)
@@ -168,6 +262,7 @@ function alias_options(name, line, wildcards)
   @WMultiline:         @w(%s@w)
   @WTrim common:       @w(%s@w)
   @WExits after Fight: @w(%s@w)
+  @WUse Database:      @w(%s@w)
   @WNorth Cexit:       @w(%s@w)
   @WEast Cexit:        @w(%s@w)
   @WSouth Cexit:       @w(%s@w)
@@ -180,6 +275,7 @@ function alias_options(name, line, wildcards)
     options_cexit_multiline,
     options_cexit_trim_commmon,
     options_exits_after_fight,
+    options_use_database,
     cexit_north,
     cexit_east,
     cexit_south,
@@ -303,6 +399,24 @@ function alias_set_debug_mode(name, line, wildcards)
     debug_mode = new_debug_mode
 end
 
+function alias_set_use_database(name, line, wildcards)
+    local new_use_database = -1
+
+    if use_database == 1 then
+        new_use_database = 0
+    else
+        new_use_database = 1
+    end
+
+    if new_use_database == 0 then
+        Message("@WDatabase integration disabled - using mapper plugin calls")
+    else
+        Message("@WDatabase integration enabled - reading exits directly from mapper database")
+    end
+    SetVariable(use_database_var_name, new_use_database)
+    use_database = new_use_database
+end
+
 function alias_set_max_length(name, line, wildcards)
     local new_max_length = tonumber(Trim(wildcards.max_length))
     if new_max_length == nil or new_max_length == 0 then
@@ -364,6 +478,95 @@ function alias_cexit(name, line, wildcards)
     Execute(cexit.cmd)
 end
 
+--
+-- Exit Processing Functions
+--
+
+function prepare_all_exits()
+    if not room_id or room_id == 0 then
+        Debug("No valid room_id for exit preparation")
+        return
+    end
+
+    -- Get all exits from chosen source (database or mapper plugin)
+    local all_exits = get_custom_exits(tostring(room_id))
+
+    -- Standard direction mappings
+    local standard_dirs = {
+        n = "north", north = "north",
+        e = "east", east = "east",
+        s = "south", south = "south",
+        w = "west", west = "west",
+        u = "up", up = "up",
+        d = "down", down = "down"
+    }
+
+    -- Custom cexit command mappings to standard directions
+    local cexit_mappings = {
+        [cexit_north] = "north",
+        [cexit_east] = "east",
+        [cexit_south] = "south",
+        [cexit_west] = "west",
+        [cexit_up] = "up",
+        [cexit_down] = "down"
+    }
+
+    -- Clear custom exits array
+    cexits = {}
+
+    -- Process all exits from database/mapper
+    for dir, dest_room in pairs(all_exits) do
+        if standard_dirs[dir] then
+            -- Handle standard direction exits (n, s, e, w, u, d, north, south, etc.)
+            local std_dir = standard_dirs[dir]
+            if not exits[std_dir].room_id and dest_room ~= "-1" then
+                -- GMCP didn't have this exit and it's not an invalid (-1) destination
+                exits[std_dir].room_id = dest_room
+                exits[std_dir].cmd = dir  -- Use original direction command
+                Debug(string.format("Added missing standard exit: %s -> %s", dir, dest_room))
+            end
+        elseif cexit_mappings[dir] then
+            -- Handle custom cexit commands that map to standard directions
+            local std_dir = cexit_mappings[dir]
+            exits[std_dir].room_id = dest_room
+            exits[std_dir].cmd = dir  -- Use the custom cexit command
+            Debug(string.format("Added cexit standard exit: %s (%s) -> %s", std_dir, dir, dest_room))
+        else
+            -- Handle true custom exits - add to cexits array
+            table.insert(cexits, {
+                text = dir,
+                cmd = dir,
+                room_id = dest_room
+            })
+            Debug(string.format("Added custom exit: %s -> %s", dir, dest_room))
+        end
+    end
+
+    -- Apply existing custom exit processing (trimming, length limits, etc.)
+    process_custom_exit_display_options()
+end
+
+function process_custom_exit_display_options()
+    -- Apply existing cexit processing logic for display formatting
+    for i, cexit in ipairs(cexits) do
+        -- Apply trimming if enabled
+        if cexit_trim_commmon == 1 then
+            cexit.text = string.gsub(cexit.text, "^enter ", "")
+            cexit.text = string.gsub(cexit.text, "^say ", "")
+        end
+
+        -- Apply length limits if configured
+        if cexit_max_length > 0 then
+            cexit.text = string.sub(cexit.text, 1, cexit_max_length)
+        end
+
+        -- Add quotes if text contains spaces
+        if cexit.text:match("%s") then
+            cexit.text = "'" .. cexit.text .. "'"
+        end
+    end
+end
+
 function on_room_info_update(room_info)
     if room_info.exits == nil then
         room_id = 0
@@ -376,72 +579,23 @@ function on_room_info_update(room_info)
     room_id = tonumber(room_info.num)
     room_name = room_info.name
 
+    -- Build standard exits from GMCP data only
     exits = {
-        north = {
-            cmd = "north",
-            room_id = room_info.exits.n
-        },
-        east = {
-            cmd = "east",
-            room_id = room_info.exits.e
-        },
-        south = {
-            cmd = "south",
-            room_id = room_info.exits.s
-        },
-        west = {
-            cmd = "west",
-            room_id = room_info.exits.w
-        },
-        up = {
-            cmd = "up",
-            room_id = room_info.exits.u
-        },
-        down = {
-            cmd = "down",
-            room_id = room_info.exits.d
-        },
+        north = { cmd = "north", room_id = room_info.exits.n },
+        east = { cmd = "east", room_id = room_info.exits.e },
+        south = { cmd = "south", room_id = room_info.exits.s },
+        west = { cmd = "west", room_id = room_info.exits.w },
+        up = { cmd = "up", room_id = room_info.exits.u },
+        down = { cmd = "down", room_id = room_info.exits.d },
     }
 
-    -- Read custom exits from mapper plugin
+    -- Custom exits will be populated in prepare_all_exits()
     cexits = {}
-
-    local rc, room_cexits = CallPlugin(plugin_id_gmcp_mapper, "room_cexits", room_id)
-    if (rc == error_code.eOK) then
-        local room_cexits = loadstring(string.format("return %s", room_cexits))()
-        if room_cexits ~= nil then
-            for k, v in pairs(room_cexits) do
-                if k == cexit_north then
-                    exits.north.room_id = v
-                    exits.north.cmd = k
-                elseif k == cexit_east then
-                    exits.east.room_id = v
-                    exits.east.cmd = k
-                elseif k == cexit_south then
-                    exits.south.room_id = v
-                    exits.south.cmd = k
-                elseif k == cexit_west then
-                    exits.west.room_id = v
-                    exits.west.cmd = k
-                elseif k == cexit_up then
-                    exits.up.room_id = v
-                    exits.up.cmd = k
-                elseif k == cexit_down then
-                    exits.down.room_id = v
-                    exits.down.cmd = k
-                else
-                    table.insert(cexits, {
-                        text = k,
-                        cmd = k,
-                        room_id = v
-                    })
-                end
-            end
-        end
-    end
 end
 
 function trigger_exits(name, line, wildcards, style)
+    -- Prepare all exits (standard + custom) from database/mapper
+    prepare_all_exits()
     display_exits()
     draw_window()
 end
@@ -503,18 +657,6 @@ function display_exits()
     for i, cexit in ipairs(cexits) do
         ColourTell("green", "", " ")
         local text = cexit.text
-
-        if cexit_trim_commmon == 1 then
-            text = string.gsub(text, "^enter ", "")
-            text = string.gsub(text, "^say ", "")
-        end
-
-        if cexit_max_length > 0 then
-            text = string.sub(text, 1, cexit_max_length)
-        end
-        if text:match("%s") then
-            text = "'" .. text .. "'"
-        end
         local hint = "'" .. cexit.text .. "' moves to " .. cexit.room_id
         Hyperlink(cexit.cmd, text, hint, "green", "", false, no_underline)
     end
@@ -680,18 +822,6 @@ function draw_window()
 
     for i, cexit in ipairs(cexits) do
         local ctext = cexit.text
-
-        if cexit_trim_commmon == 1 then
-            ctext = string.gsub(ctext, "^enter ", "")
-            ctext = string.gsub(ctext, "^say ", "")
-        end
-
-        if cexit_max_length > 0 then
-            ctext = string.sub(ctext, 1, cexit_max_length)
-        end
-        if ctext:match("%s") then
-            ctext = "'" .. ctext .. "'"
-        end
         local hint = "'" .. cexit.text .. "' moves to " .. cexit.room_id
 
         table.insert(links, {

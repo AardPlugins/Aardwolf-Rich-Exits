@@ -94,6 +94,13 @@ dofile(GetPluginInfo(GetPluginID(), 20) .. "Aardwolf_Rich_Exits.lua")
 
         <alias enabled="y"
             regexp="y"
+            match="^rexit set database$"
+            script="alias_set_use_database"
+            sequence="100"
+            send_to="12"></alias>
+
+        <alias enabled="y"
+            regexp="y"
             match="^rexit debug$"
             script="alias_set_debug_mode"
             sequence="100"

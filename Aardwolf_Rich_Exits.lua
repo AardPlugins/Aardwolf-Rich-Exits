@@ -469,8 +469,25 @@ end
 --
 
 function alias_cexit(name, line, wildcards)
-    local index = tonumber(wildcards.index)
-    local cexit = cexits[index]
+    local index = wildcards.index
+    local cexit = nil
+    if index == "n" then
+        cexit = exits.north
+    elseif index == "e" then
+        cexit = exits.east
+    elseif index == "s" then
+        cexit = exits.south
+    elseif index == "w" then
+        cexit = exits.west
+    elseif index == "u" then
+        cexit = exits.up
+    elseif index == "d" then
+        cexit = exits.down
+    else
+        index = tonumber(wildcards.index)
+        cexit = cexits[index]
+    end
+
     if cexit == nil then
         Message("Custom exit not found with index " .. index)
         return
